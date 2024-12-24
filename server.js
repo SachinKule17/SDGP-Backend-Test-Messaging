@@ -88,7 +88,7 @@ wss.on('connection', (ws, req) => {
 
 
     // Store clients with unique identifiers
-    ws.on('message', async (message) => {
+    ws.on('grpmessage', async (message) => {
         try {
             const data = JSON.parse(message);
 
@@ -132,11 +132,10 @@ wss.on('connection', (ws, req) => {
         }
     });
     
-    
 
-    ws.on('close', () => {
-        console.log('Client disconnected');
-    });
+    // ws.on('close', () => {
+    //     console.log('Client disconnected');
+    // });
 });
 
 // Start the server
