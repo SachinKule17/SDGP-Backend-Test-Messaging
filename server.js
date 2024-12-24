@@ -3,6 +3,10 @@ const WebSocket = require('ws');
 const { encrypt, decrypt } = require('./utils/encryption');
 const { supabase } = require('./services/supabase');
 const { insertMessage, updateMessageStatus } = require('./models/message');
+const { notifyGroupMembers } = require('./groupNotification');
+const { insertGroupMessage } = require('./GroupValidation');
+const { isUserInGroup } = require('./InsertGroupMassage');
+
 
 // Create HTTP server
 const server = http.createServer();
@@ -79,6 +83,52 @@ wss.on('connection', (ws, req) => {
             }
         } catch (error) {
             console.error('Error handling message:', error.message || error.stack || error);
+        }
+    });
+
+
+    // Store clients with unique identifiers
+    ws.on('message', async (message) => {
+        try {
+            const data = JSON.parse(message);
+
+            switch (data.type) {
+                case 'register':
+                    // Add client to map
+                    clients.set(data.user_id, ws);
+                    break;
+
+                case 'send_message':
+                    // Insert the message into the database
+                    const groupMessage = await insertGroupMessage(data.sender_id, data.grp_id, data.content);
+
+                    // Notify group members
+                    await notifyGroupMembers(clients, data.grp_id, groupMessage.content);
+                    break;
+
+                case 'check_group':
+                    // Validate if user is in the group
+                    const isMember = await isUserInGroup(data.user_id, data.grp_id);
+                    ws.send(JSON.stringify({ type: 'group_check', isMember }));
+                    break;
+
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        } catch (error) {
+            console.error('Error processing message:', error.message);
+            ws.send(JSON.stringify({ error: error.message }));
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('Client disconnected');
+        // Remove client from map
+        for (let [userId, client] of clients) {
+            if (client === ws) {
+                clients.delete(userId);
+                break;
+            }
         }
     });
     
